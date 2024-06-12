@@ -14,8 +14,6 @@
 
 PDF Printer is a web application and Python script that converts images into PDF files, either individually or by compiling them into a single PDF. The project includes a user-friendly interface that allows for drag-and-drop functionality for easy conversion.
 
-## Link
-
 ### [Click here for the website](https://secret-guest.github.io/PDF_Printer/)
 
 ## Web Application Usage
