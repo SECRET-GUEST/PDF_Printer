@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Printer</title>
+
+    <style>
+        body {
+            background-color: #f0eae3;
+            font-family: 'Arial', sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+        }
+
+        .title-top {
+            z-index: -1;
+            font-size: 17vw;
+            font-weight: bold;
+            color: white;
+            overflow: hidden;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            text-align: center;
+            margin: 0;
+        }
+
+        .content {
+            position: relative;
+            display: block;
+            width: 100%;
+            margin: 0 auto;
+            padding: 2%;
+            margin-top: -28%;
+            transition: margin-top 0.3s;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .drop-zone {
+            position: relative;
+            border: 2px dashed #a7cbd9;
+            padding: 20px;
+            margin: 5%;
+            cursor: pointer;
+            overflow: hidden;
+            transition: border-color 0.3s;
+        }
+
+        .drop-zone.over::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 88%;
+            height: 88%;
+            border: 2px dotted #a7cbd9;
+            border-radius: 10px;
+            animation: fadeAndPulse 2s infinite alternate;
+            transform: translate(-50%, -50%);
+        }
+
+        .drop-zone.over::after {
+            content: '';
+            opacity: 0;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 80%;
+            height: 80%;
+            border: 2px dotted #a7cbd9;
+            border-radius: 10px;
+            animation: pulse 2s infinite alternate;
+            transform: translate(-50%, -50%);
+            animation: fadeAndPulse 2s infinite alternate;
+            transform: translate(-50%, -50%);
+            animation-delay: 0.5s;
+        }
+
+        @keyframes fadeAndPulse {
+            0%, 100% {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(1);
+                border-color: #a7cbd9;
+            }
+            100% {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1.1);
+                border-color: #b3ffb3;
+            }
+        }
+
+        .thumbnail-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .thumbnail {
+            width: 100px;
+            height: 100px;
+            margin: 5px;
+            object-fit: cover;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .button {
+            padding: 10px 20px;
+            font-size: 1.5em;
+            background-color: #a7cbd9;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            color: white;
+            margin-top: 20px;
+        }
+
+        .toggle-switch {
+            margin: 20px;
+            display: inline-block;
+        }
+
+        .toggle-switch input {
+            display: none;
+        }
+
+        .toggle-switch-label {
+            display: block;
+            width: 60px;
+            height: 30px;
+            background: #ccc;
+            border-radius: 15px;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .toggle-switch-label:before {
+            content: '';
+            position: absolute;
+            width: 26px;
+            height: 26px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: 0.3s;
+        }
+
+        .toggle-switch input:checked + .toggle-switch-label:before {
+            left: 32px;
+        }
+
+        .settings {
+            margin: 20px;
+        }
+
+        .settings label {
+            margin-right: 10px;
+        }
+
+        .settings input {
+            padding: 5px;
+            font-size: 1em;
+        }
+
+        .refresh-button-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .refresh-button {
+            font-size: 2em;
+            border: none;
+            background: none;
+            cursor: pointer;
+            color: #a7cbd9;
+            margin-right: 20px;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.6.0/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.16.0/pdf-lib.min.js"></script>
+</head>
+<body>
+    <div class="title-top">PDF Printer</div>
+    <div class="content" id="content">
+        <div class="drop-zone" id="dropZone">Déposez vos images ici ou cliquez pour sélectionner des fichiers.</div>
+        <input type="file" id="fileInput" multiple style="display: none;" accept="image/*" />
+
+        <div class="refresh-button-container">
+            <button class="refresh-button" onclick="location.reload();">⟳</button>
+        </div>
+
+        <div class="settings">
+            <label for="dpi">DPI:</label>
+            <input type="number" id="dpi" value="300">
+            <label for="marginMm">Marges (mm):</label>
+            <input type="number" id="marginMm" value="5">
+        </div>
+
+        <div class="toggle-switch">
+            <input type="checkbox" id="compileToPdf" checked>
+            <label for="compileToPdf" class="toggle-switch-label"></label>
+            <span id="toggleLabel">Créer un unique PDF</span>
+        </div>
+
+        <button id="processButton" class="button" style="display: none;">Lancer le traitement</button>
+
+        <div class="thumbnail-container" id="thumbnailContainer"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const content = document.getElementById('content');
+            setTimeout(() => {
+                content.style.marginTop = '18%';
+            }, 100);
+        });
+
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const processButton = document.getElementById('processButton');
+        const compileToPdf = document.getElementById('compileToPdf');
+        const toggleLabel = document.getElementById('toggleLabel');
+        const dpiInput = document.getElementById('dpi');
+        const marginMmInput = document.getElementById('marginMm');
+        const thumbnailContainer = document.getElementById('thumbnailContainer');
+        let files = [];
+
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('over');
+        });
+
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('over');
+            const droppedFiles = Array.from(e.dataTransfer.files);
+            const imageFiles = droppedFiles.filter(file => file.type.startsWith('image/'));
+            if (imageFiles.length === 0) {
+                alert('Veuillez déposer uniquement des fichiers image.');
+                return;
+            }
+            files = files.concat(imageFiles); 
+            displayThumbnails();
+            if (files.length > 0) {
+                processButton.style.display = 'inline-block';
+            }
+        });
+
+        fileInput.addEventListener('change', () => {
+            const selectedFiles = Array.from(fileInput.files);
+            const imageFiles = selectedFiles.filter(file => file.type.startsWith('image/'));
+            if (imageFiles.length === 0) {
+                alert('Veuillez sélectionner uniquement des fichiers image.');
+                return;
+            }
+            files = files.concat(imageFiles); 
+            displayThumbnails();
+            if (files.length > 0) {
+                processButton.style.display = 'inline-block';
+            }
+        });
+
+        compileToPdf.addEventListener('change', () => {
+            if (compileToPdf.checked) {
+                toggleLabel.textContent = 'Créer un unique PDF';
+            } else {
+                toggleLabel.textContent = 'Créer des fichiers PDF individuels';
+            }
+        });
+
+        function displayThumbnails() {
+            thumbnailContainer.innerHTML = '';
+            files.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.classList.add('thumbnail');
+                    thumbnailContainer.appendChild(img);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        processButton.addEventListener('click', async () => {
+            const dpi = parseInt(dpiInput.value, 10);
+            const marginMm = parseInt(marginMmInput.value, 10);
+            const A4_WIDTH = Math.round(210 * dpi / 25.4);
+            const A4_HEIGHT = Math.round(297 * dpi / 25.4);
+            const MARGIN = Math.round(marginMm * dpi / 25.4);
+            const PRINTABLE_WIDTH = A4_WIDTH - 2 * MARGIN;
+            const PRINTABLE_HEIGHT = A4_HEIGHT - 2 * MARGIN;
+            const supportedFormats = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/bmp', 'image/tiff'];
+
+            const validFiles = files.filter(file => supportedFormats.includes(file.type));
+
+            if (compileToPdf.checked) {
+                const pdfDoc = await PDFLib.PDFDocument.create();
+                for (const file of validFiles) {
+                    const imgBytes = await file.arrayBuffer();
+                    let img;
+                    if (file.type === 'image/jpeg' || file.type === 'image/jpg') {
+                        img = await pdfDoc.embedJpg(imgBytes);
+                    } else {
+                        img = await pdfDoc.embedPng(imgBytes);
+                    }
+                    const imgDims = img.scale(1);
+                    const page = pdfDoc.addPage([A4_WIDTH, A4_HEIGHT]);
+
+                    let imgWidth, imgHeight;
+                    if (imgDims.width / imgDims.height > PRINTABLE_WIDTH / PRINTABLE_HEIGHT) {
+                        imgWidth = PRINTABLE_WIDTH;
+                        imgHeight = PRINTABLE_WIDTH / imgDims.width * imgDims.height;
+                    } else {
+                        imgWidth = PRINTABLE_HEIGHT / imgDims.height * imgDims.width;
+                        imgHeight = PRINTABLE_HEIGHT;
+                    }
+
+                    const x = (A4_WIDTH - imgWidth) / 2;
+                    const y = (A4_HEIGHT - imgHeight) / 2;
+                    page.drawImage(img, { x, y, width: imgWidth, height: imgHeight });
+                }
+                const pdfBytes = await pdfDoc.save();
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'compiled_images.pdf';
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                }, 0);
+            } else {
+                const zip = new JSZip();
+                for (const file of validFiles) {
+                    const imgBytes = await file.arrayBuffer();
+                    const pdfDoc = await PDFLib.PDFDocument.create();
+                    let img;
+                    if (file.type === 'image/jpeg' || file.type === 'image/jpg') {
+                        img = await pdfDoc.embedJpg(imgBytes);
+                    } else {
+                        img = await pdfDoc.embedPng(imgBytes);
+                    }
+                    const imgDims = img.scale(1);
+                    const page = pdfDoc.addPage([A4_WIDTH, A4_HEIGHT]);
+
+                    let imgWidth, imgHeight;
+                    if (imgDims.width / imgDims.height > PRINTABLE_WIDTH / PRINTABLE_HEIGHT) {
+                        imgWidth = PRINTABLE_WIDTH;
+                        imgHeight = PRINTABLE_WIDTH / imgDims.width * imgDims.height;
+                    } else {
+                        imgWidth = PRINTABLE_HEIGHT / imgDims.height * imgDims.width;
+                        imgHeight = PRINTABLE_HEIGHT;
+                    }
+
+                    const x = (A4_WIDTH - imgWidth) / 2;
+                    const y = (A4_HEIGHT - imgHeight) / 2;
+                    page.drawImage(img, { x, y, width: imgWidth, height: imgHeight });
+                    const pdfBytes = await pdfDoc.save();
+                    zip.file(`${file.name.replace(/\.[^/.]+$/, "")}.pdf`, pdfBytes);
+                }
+                zip.generateAsync({ type: 'blob' }).then((content) => {
+                    const url = URL.createObjectURL(content);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'images.zip';
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                    }, 0);
+                });
+            }
+        });
+    </script>
+</body>
+</html>
