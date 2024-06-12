@@ -2,7 +2,7 @@ import os
 from PIL import Image
 
 # Utilisation
-input_folder = r"C:\Users\lemon\Desktop\1"
+input_folder = r"C:\YOUR\PATH\HERE\..."
 compile_to_pdf = False  # Mettre True pour compiler toutes les images dans un seul PDF
 output_folder_name = "formatted"  # Nom du dossier de sortie
 dpi = 300  # Résolution en DPI (points par pouce)
